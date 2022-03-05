@@ -6,8 +6,7 @@ class WeekSummary extends StatelessWidget {
   final int week;
 
   String calculateLaughs([String filter = '']) {
-    final dynamic total =
-        weeksData[week - 1].days.fold(0, (dynamic acc, DayData cur) {
+    final total = weeksData[week - 1].days.fold(0, (int acc, DayData cur) {
       if ((filter == 'weekday' && (cur.day == 0 || cur.day == 6)) ||
           (filter == 'weekend' && (cur.day > 0 && cur.day < 6))) {
         return acc;
@@ -18,8 +17,7 @@ class WeekSummary extends StatelessWidget {
   }
 
   String calculateMinMax([String filter = '']) {
-    final dynamic dayMax =
-        weeksData[week - 1].days.reduce((DayData a, DayData b) {
+    final dayMax = weeksData[week - 1].days.reduce((DayData a, DayData b) {
       if (a.laughs > b.laughs) {
         return filter == 'worst' ? b : a;
       } else

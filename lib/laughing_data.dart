@@ -1,9 +1,9 @@
-List weeksData = <WeekData>[
+List<WeekData> weeksData = [
   WeekData(
     days: [
       DayData(
         day: 0,
-        laughs: 12,
+        laughs: 4,
       ),
       DayData(
         day: 1,
@@ -11,15 +11,15 @@ List weeksData = <WeekData>[
       ),
       DayData(
         day: 2,
-        laughs: 8,
+        laughs: 4,
       ),
       DayData(
         day: 3,
-        laughs: 2,
+        laughs: 4,
       ),
       DayData(
         day: 4,
-        laughs: 1,
+        laughs: 4,
       ),
       DayData(
         day: 5,
@@ -27,7 +27,7 @@ List weeksData = <WeekData>[
       ),
       DayData(
         day: 6,
-        laughs: 18,
+        laughs: 4,
       ),
     ],
   ),
@@ -67,7 +67,7 @@ List weeksData = <WeekData>[
     days: [
       DayData(
         day: 0,
-        laughs: 4,
+        laughs: 0,
       ),
       DayData(
         day: 1,
@@ -79,19 +79,19 @@ List weeksData = <WeekData>[
       ),
       DayData(
         day: 3,
-        laughs: 1,
+        laughs: 0,
       ),
       DayData(
         day: 4,
-        laughs: 2,
+        laughs: 4,
       ),
       DayData(
         day: 5,
-        laughs: 8,
+        laughs: 3,
       ),
       DayData(
         day: 6,
-        laughs: 7,
+        laughs: 3,
       ),
     ],
   ),
