@@ -29,7 +29,6 @@ THE SOFTWARE.
 */
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'components/slide_selector.dart';
 import 'components/week_summary.dart';
@@ -74,48 +73,48 @@ class _DashboardState extends State<Dashboard>
     initialPage: 3,
   );
 
-  // 1
-  late AnimationController _controller;
   double chartHeight = 160;
   static const leftPadding = 60.0;
   static const rightPadding = 60.0;
+
   Path _path = Path();
   Path _fillPath = Path();
 
+  late List<ChartDataPoint> prevChartData;
   late List<ChartDataPoint> chartData;
 
-  // 2
+  late AnimationController _pathController;
+  CurvedAnimation? _pathCurve;
+  Animation? _pathAnimation;
+
   @override
   void initState() {
     super.initState();
-    chartData = normalizeData(weeksData[activeWeek - 1]);
-    _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600), value: 0.75);
+    setState(() {
+      chartData = normalizeData(weeksData[activeWeek - 1]);
+      prevChartData = normalizeData(zeroStateData);
+    });
 
-    SchedulerBinding.instance!.addPostFrameCallback((_) {
-      final availableChartWidth =
-          MediaQuery.of(context).size.width - leftPadding - rightPadding;
-      final chartStartPercentage =
-          leftPadding / MediaQuery.of(context).size.width;
-      final chartEndPercentage =
-          1 - (rightPadding / MediaQuery.of(context).size.width);
-      print(chartEndPercentage);
-      // _curve = CurvedAnimation(
-      //   parent: _controller,
-      //   curve: Curves.ease,
-      //   // curve: Curves.linear,
-      //   reverseCurve: Curves.easeInQuart,
-      // );
-      // _animation = Tween(begin: 0.0, end: 1.0).animate(_curve!)
-      //   ..addListener(() {
-      //     setState(() {});
-      //   });
-      Future.delayed(const Duration(milliseconds: 800), () {
-        _controller.animateTo(chartEndPercentage);
+    _pathController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400), value: 0);
+    _pathCurve = CurvedAnimation(
+      parent: _pathController,
+      curve: Curves.ease,
+      reverseCurve: Curves.easeInQuart,
+    );
+    _pathAnimation = Tween(begin: 0.0, end: 1.0).animate(_pathCurve!)
+      ..addListener(() {
+        setState(() {
+          _path = drawPath(false);
+          _fillPath = drawPath(true);
+        });
       });
-      _path = drawPath(chartData, false);
-      _fillPath = drawPath(chartData, true);
-      setState(() {});
+
+    _pathController.forward();
+    Future.delayed(const Duration(milliseconds: 400), () {
+      setState(() {
+        prevChartData = chartData;
+      });
     });
   }
 
@@ -125,46 +124,35 @@ class _DashboardState extends State<Dashboard>
     });
     final normalizedList = <ChartDataPoint>[];
     weekData.days.forEach((element) {
-      normalizedList.add(ChartDataPoint(value: element.laughs / maxDay.laughs));
+      normalizedList.add(ChartDataPoint(
+          value: maxDay.laughs == 0 ? 0 : element.laughs / maxDay.laughs));
     });
     return normalizedList;
   }
 
-  Path drawPath(List<ChartDataPoint> data, bool closePath) {
+  Path drawPath(bool closePath) {
     final path = Path();
     final w = MediaQuery.of(context).size.width;
     final h = chartHeight;
     final segmentWidth =
-        (1 / (data.length - 1) / 3) * (w - leftPadding - rightPadding);
-    path.moveTo(0, h - data[0].value * h);
+        (1 / (chartData.length - 1) / 3) * (w - leftPadding - rightPadding);
 
-    // intro to cubicTo()
-    // final segmentWidth = (1 / 2 / 3) * w;
-    // path.moveTo(0, h);
-    // path.cubicTo(segmentWidth, h, 2 * segmentWidth, 0, 3 * segmentWidth, 0);
-    // path.cubicTo(4 * segmentWidth, 0, 5 * segmentWidth, h, 6 * segmentWidth,
-    // h);
+    path.moveTo(0, getY(prevChartData, chartData, 0));
 
-    path.lineTo(leftPadding, h - data[0].value * h);
-
-    // straight line
-    // for (var i = 1; i < data.length; i++) {
-    //   path.lineTo((3 * (i - 1) + 3) * segmentWidth + leftPadding,
-    //       h - (data[i].value * h));
-    // }
+    path.lineTo(leftPadding, getY(prevChartData, chartData, 0));
 
     // curved line
-    for (var i = 1; i < data.length; i++) {
+    for (var i = 1; i < chartData.length; i++) {
       path.cubicTo(
           (3 * (i - 1) + 1) * segmentWidth + leftPadding,
-          h - (data[i - 1].value * h),
+          getY(prevChartData, chartData, i - 1),
           (3 * (i - 1) + 2) * segmentWidth + leftPadding,
-          h - (data[i].value * h),
+          getY(prevChartData, chartData, i),
           (3 * (i - 1) + 3) * segmentWidth + leftPadding,
-          h - (data[i].value * h));
+          getY(prevChartData, chartData, i));
     }
 
-    path.lineTo(w, h - data[data.length - 1].value * h);
+    path.lineTo(w, getY(prevChartData, chartData, chartData.length - 1));
 
     // for the gradient fill, we want to close the path
     if (closePath) {
@@ -174,37 +162,32 @@ class _DashboardState extends State<Dashboard>
     return path;
   }
 
-  void changeWeek(int week) {
-    setState(() {
-      activeWeek = week;
-      chartData = normalizeData(weeksData[week - 1]);
-      _path = drawPath(chartData, false);
-      _fillPath = drawPath(chartData, true);
-      summaryController.animateToPage(week,
-          duration: const Duration(milliseconds: 300), curve: Curves.ease);
-    });
+  double getY(
+      List<ChartDataPoint> prevData, List<ChartDataPoint> newData, int index) {
+    // uses linear interpolation and the animation value to transition from
+    // the previous to the new chart point
+    final v = _pathAnimation!.value as double;
+    return chartHeight -
+        ui.lerpDouble(prevData[index].value, newData[index].value, v)! *
+            chartHeight;
   }
 
-  Offset calculate(double value) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    // var newValue = (value * screenWidth) / screenWidth;
-
-    final pathMetrics = _path.computeMetrics().toList();
-    final pathMetric = pathMetrics.isNotEmpty ? pathMetrics.first : null;
-    final newValue = pathMetric != null ? pathMetric.length * value : 0.0;
-    final pos = pathMetric != null
-        ? pathMetric.getTangentForOffset(newValue)!.position
-        : Offset.zero;
-
-    // print(pathMetric?.getTangentForOffset(newValue)!.angle);
-    // print(newValue);
-    // print(pathMetric?.getTangentForOffset(newValue)!.position.dx);
-    // print(pathMetric!.length);
-    // print((value * screenWidth) / screenWidth);
-    // print('$newValue/${pathMetric?.length} --- $value --- ${pos.dx}');
-    // print(pathMetric);
-
-    return pos;
+  void changeWeek(int week) {
+    if (!_pathController.isAnimating) {
+      setState(() {
+        activeWeek = week;
+        chartData = normalizeData(weeksData[week - 1]);
+        _pathController.value = 0.0;
+        _pathController.forward();
+        summaryController.animateToPage(week,
+            duration: const Duration(milliseconds: 300), curve: Curves.ease);
+      });
+      Future.delayed(const Duration(milliseconds: 400), () {
+        setState(() {
+          prevChartData = chartData;
+        });
+      });
+    }
   }
 
   @override
@@ -232,6 +215,7 @@ class _DashboardState extends State<Dashboard>
               padding: const EdgeInsets.all(20),
               child: SlideSelector(
                 defaultSelectedIndex: activeWeek - 1,
+                tappable: !_pathController.isAnimating,
                 items: <SlideSelectorItem>[
                   SlideSelectorItem(
                     text: 'Week 1',
@@ -258,101 +242,34 @@ class _DashboardState extends State<Dashboard>
             Container(
               height: chartHeight + 80,
               color: const Color(0xFF158443),
-              child: GestureDetector(
-                onHorizontalDragUpdate: (e) {
-                  final dotPercentage =
-                      e.globalPosition.dx / MediaQuery.of(context).size.width;
-                  _controller.value = dotPercentage.clamp(0.0, 1.0);
-                },
-                onHorizontalDragEnd: (e) {
-                  // print(e);
-                },
-                child: Stack(
-                  children: [
-                    ChartLaughLabels(
-                      chartHeight: chartHeight,
-                      topPadding: 40,
-                      bottomPadding: 40,
+              child: Stack(
+                children: [
+                  ChartLaughLabels(
+                    chartHeight: chartHeight,
+                    topPadding: 40,
+                    bottomPadding: 40,
+                    leftPadding: leftPadding,
+                    rightPadding: rightPadding,
+                    weekData: weeksData[activeWeek - 1],
+                  ),
+                  const Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: ChartDayLabels(
                       leftPadding: leftPadding,
                       rightPadding: rightPadding,
-                      weekData: weeksData[activeWeek - 1],
                     ),
-                    const Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: ChartDayLabels(
-                        leftPadding: leftPadding,
-                        rightPadding: rightPadding,
-                      ),
+                  ),
+                  Positioned(
+                    top: 40,
+                    child: CustomPaint(
+                      size:
+                          Size(MediaQuery.of(context).size.width, chartHeight),
+                      painter: PathPainter(path: _path, fillPath: _fillPath),
                     ),
-                    Positioned(
-                      top: 40,
-                      child: CustomPaint(
-                        size: Size(
-                            MediaQuery.of(context).size.width, chartHeight),
-                        painter: PathPainter(path: _path, fillPath: _fillPath),
-                      ),
-                    ),
-                    AnimatedBuilder(
-                      animation: _controller,
-                      builder: (BuildContext context, Widget? child) {
-                        return Positioned(
-                          // top: calculate(0.89).dy + 40 - 7,
-                          // left: calculate(0.89).dx - 7,
-                          top: calculate(_controller.value).dy + 40 - 7,
-                          left: calculate(_controller.value).dx - 7,
-                          child: Container(
-                            color: Colors.red,
-                            height: 14,
-                            width: 14,
-                            clipBehavior: Clip.none,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF158443),
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [
-                                      const BoxShadow(
-                                        offset: Offset.zero,
-                                        spreadRadius: 4,
-                                        blurRadius: 0,
-                                        color: Colors.white,
-                                      )
-                                    ],
-                                  ),
-                                  width: 14,
-                                  height: 14,
-                                ),
-                                Positioned(
-                                  top: -32,
-                                  left: 7,
-                                  child: FractionalTranslation(
-                                    translation: const Offset(-0.5, 0),
-                                    child: Text(
-                                      weeksData[activeWeek - 1]
-                                          .days[6]
-                                          .laughs
-                                          .toStringAsFixed(1),
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    )
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             Container(
