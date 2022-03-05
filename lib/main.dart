@@ -142,7 +142,9 @@ class _DashboardState extends State<Dashboard>
                 children: [
                   Container(
                     height: chartHeight + 80,
-                    child: const Placeholder(),
+                    child: const Placeholder(
+                      color: Colors.white,
+                    ),
                   )
                 ],
               ),
