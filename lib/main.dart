@@ -72,28 +72,55 @@ class _DashboardState extends State<Dashboard>
     viewportFraction: 1,
     initialPage: 3,
   );
-  double chartHeight = 160;
+  double chartHeight = 240;
+  static const leftPadding = 60.0;
+  static const rightPadding = 60.0;
+  late List<ChartDataPoint> chartData;
 
   @override
   void initState() {
     super.initState();
+    setState(() {
+      chartData = normalizeData(weeksData[activeWeek - 1]);
+    });
   }
 
   void changeWeek(int week) {
     setState(() {
       activeWeek = week;
+      chartData = normalizeData(weeksData[week - 1]);
       summaryController.animateToPage(week,
           duration: const Duration(milliseconds: 300), curve: Curves.ease);
     });
   }
 
+  List<ChartDataPoint> normalizeData(WeekData weekData) {
+    final maxDay = weekData.days.reduce((DayData a, DayData b) {
+      return a.laughs > b.laughs ? a : b;
+    });
+    final normalizedList = <ChartDataPoint>[];
+    weekData.days.forEach((element) {
+      normalizedList.add(ChartDataPoint(
+          value: maxDay.laughs == 0 ? 0 : element.laughs / maxDay.laughs));
+    });
+    return normalizedList;
+  }
+
   Path drawPath() {
     final w = MediaQuery.of(context).size.width;
     final h = chartHeight;
+    final segmentWidth =
+        (1 / (chartData.length - 1) / 3) * (w - leftPadding - rightPadding);
     final path = Path();
     path.moveTo(0, h);
     path.lineTo(w / 2, h * 0.5);
+    // for (var i = 1; i < chartData.length; i++) {
+    //   final x = (3 * (i - 1) + 3) * segmentWidth + leftPadding;
+    //   final y = h - (chartData[i].value * h);
+    //   path.lineTo(x, y);
+    // }
     path.lineTo(w, h * 0.75);
+    return path;
     return path;
   }
 
@@ -146,12 +173,12 @@ class _DashboardState extends State<Dashboard>
             ),
             const SizedBox(height: 20),
             Container(
-              height: chartHeight + 80,
+              height: chartHeight,
               color: const Color(0xFF158443),
               child: Stack(
                 children: [
                   Container(
-                    height: chartHeight + 80,
+                    height: chartHeight,
                     child: CustomPaint(
                       size:
                           Size(MediaQuery.of(context).size.width, chartHeight),
@@ -208,6 +235,7 @@ class PathPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // paint the line
+    print(size.height);
     final paint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
@@ -216,5 +244,10 @@ class PathPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
+}
+
+class ChartDataPoint {
+  double value;
+  ChartDataPoint({required this.value});
 }
