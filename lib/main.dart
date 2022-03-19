@@ -87,6 +87,16 @@ class _DashboardState extends State<Dashboard>
     });
   }
 
+  Path drawPath() {
+    final w = MediaQuery.of(context).size.width;
+    final h = chartHeight;
+    final path = Path();
+    path.moveTo(0, h);
+    path.lineTo(w / 2, h * 0.5);
+    path.lineTo(w, h * 0.75);
+    return path;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -142,8 +152,10 @@ class _DashboardState extends State<Dashboard>
                 children: [
                   Container(
                     height: chartHeight + 80,
-                    child: const Placeholder(
-                      color: Colors.white,
+                    child: CustomPaint(
+                      size:
+                          Size(MediaQuery.of(context).size.width, chartHeight),
+                      painter: PathPainter(path: drawPath()),
                     ),
                   )
                 ],
@@ -188,4 +200,21 @@ class DashboardBackground extends StatelessWidget {
       ],
     );
   }
+}
+
+class PathPainter extends CustomPainter {
+  Path path;
+  PathPainter({required this.path});
+  @override
+  void paint(Canvas canvas, Size size) {
+    // paint the line
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0;
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
