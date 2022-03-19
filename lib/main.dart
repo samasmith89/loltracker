@@ -72,7 +72,7 @@ class _DashboardState extends State<Dashboard>
     viewportFraction: 1,
     initialPage: 3,
   );
-  double chartHeight = 160;
+  double chartHeight = 240;
 
   @override
   void initState() {
@@ -136,12 +136,12 @@ class _DashboardState extends State<Dashboard>
             ),
             const SizedBox(height: 20),
             Container(
-              height: chartHeight + 80,
+              height: chartHeight,
               color: const Color(0xFF158443),
               child: Stack(
                 children: [
                   Container(
-                    height: chartHeight + 80,
+                    height: chartHeight,
                     child: const Placeholder(
                       color: Colors.white,
                     ),
