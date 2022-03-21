@@ -32,6 +32,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'components/slide_selector.dart';
 import 'components/week_summary.dart';
+import 'components/chart_labels.dart';
 import 'laughing_data.dart';
 
 void main() {
@@ -140,11 +141,8 @@ class _DashboardState extends State<Dashboard>
               color: const Color(0xFF158443),
               child: Stack(
                 children: [
-                  Container(
-                    height: chartHeight,
-                    child: const Placeholder(
-                      color: Colors.white,
-                    ),
+                  const Placeholder(
+                    color: Colors.white,
                   )
                 ],
               ),
