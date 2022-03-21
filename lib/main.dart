@@ -32,6 +32,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'components/slide_selector.dart';
 import 'components/week_summary.dart';
+import 'components/chart_labels.dart';
 import 'laughing_data.dart';
 
 void main() {
@@ -72,7 +73,7 @@ class _DashboardState extends State<Dashboard>
     viewportFraction: 1,
     initialPage: 3,
   );
-  double chartHeight = 240;
+  double chartHeight = 160;
   static const leftPadding = 60.0;
   static const rightPadding = 60.0;
   late List<ChartDataPoint> chartData;
@@ -82,15 +83,6 @@ class _DashboardState extends State<Dashboard>
     super.initState();
     setState(() {
       chartData = normalizeData(weeksData[activeWeek - 1]);
-    });
-  }
-
-  void changeWeek(int week) {
-    setState(() {
-      activeWeek = week;
-      chartData = normalizeData(weeksData[week - 1]);
-      summaryController.animateToPage(week,
-          duration: const Duration(milliseconds: 300), curve: Curves.ease);
     });
   }
 
@@ -106,21 +98,39 @@ class _DashboardState extends State<Dashboard>
     return normalizedList;
   }
 
-  Path drawPath() {
+  void changeWeek(int week) {
+    setState(() {
+      activeWeek = week;
+      chartData = normalizeData(weeksData[week - 1]);
+      summaryController.animateToPage(week,
+          duration: const Duration(milliseconds: 300), curve: Curves.ease);
+    });
+  }
+
+  Path drawPath(bool closePath) {
+    final path = Path();
     final w = MediaQuery.of(context).size.width;
     final h = chartHeight;
     final segmentWidth =
         (1 / (chartData.length - 1) / 3) * (w - leftPadding - rightPadding);
-    final path = Path();
-    path.moveTo(0, h);
-    path.lineTo(w / 2, h * 0.5);
-    // for (var i = 1; i < chartData.length; i++) {
-    //   final x = (3 * (i - 1) + 3) * segmentWidth + leftPadding;
-    //   final y = h - (chartData[i].value * h);
-    //   path.lineTo(x, y);
-    // }
-    path.lineTo(w, h * 0.75);
-    return path;
+    path.moveTo(0, h - chartData[0].value * h);
+    path.lineTo(leftPadding, h - chartData[0].value * h);
+    // curved line
+    for (var i = 1; i < chartData.length; i++) {
+      path.cubicTo(
+          (3 * (i - 1) + 1) * segmentWidth + leftPadding,
+          h - chartData[i - 1].value * h,
+          (3 * (i - 1) + 2) * segmentWidth + leftPadding,
+          h - chartData[i].value * h,
+          (3 * (i - 1) + 3) * segmentWidth + leftPadding,
+          h - chartData[i].value * h);
+    }
+    path.lineTo(w, h - chartData[chartData.length - 1].value * h);
+    // for the gradient fill, we want to close the path
+    if (closePath) {
+      path.lineTo(w, h);
+      path.lineTo(0, h);
+    }
     return path;
   }
 
@@ -173,16 +183,33 @@ class _DashboardState extends State<Dashboard>
             ),
             const SizedBox(height: 20),
             Container(
-              height: chartHeight,
+              height: chartHeight + 80,
               color: const Color(0xFF158443),
               child: Stack(
                 children: [
-                  Container(
-                    height: chartHeight,
+                  ChartLaughLabels(
+                    chartHeight: chartHeight,
+                    topPadding: 40,
+                    leftPadding: leftPadding,
+                    rightPadding: rightPadding,
+                    weekData: weeksData[activeWeek - 1],
+                  ),
+                  const Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: ChartDayLabels(
+                      leftPadding: leftPadding,
+                      rightPadding: rightPadding,
+                    ),
+                  ),
+                  Positioned(
+                    top: 40,
                     child: CustomPaint(
                       size:
                           Size(MediaQuery.of(context).size.width, chartHeight),
-                      painter: PathPainter(path: drawPath()),
+                      painter: PathPainter(
+                          path: drawPath(false), fillPath: drawPath(true)),
                     ),
                   )
                 ],
@@ -231,16 +258,28 @@ class DashboardBackground extends StatelessWidget {
 
 class PathPainter extends CustomPainter {
   Path path;
-  PathPainter({required this.path});
+  Path fillPath;
+  PathPainter({required this.path, required this.fillPath});
   @override
   void paint(Canvas canvas, Size size) {
     // paint the line
-    print(size.height);
     final paint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0;
     canvas.drawPath(path, paint);
+
+    // paint the gradient fill
+    paint.style = PaintingStyle.fill;
+    paint.shader = ui.Gradient.linear(
+      Offset.zero,
+      Offset(0.0, size.height),
+      [
+        Colors.white.withOpacity(0.2),
+        Colors.white.withOpacity(0.85),
+      ],
+    );
+    canvas.drawPath(fillPath, paint);
   }
 
   @override
